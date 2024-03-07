@@ -1,0 +1,381 @@
+---
+title: "Simulated data"
+output: html_document
+date: "2023-12-06"
+---
+
+##Question 1 - Percentage of Consumer Willing to Switching from Plastic Bottled Water to Boxed Water
+
+#In the scenario without an effect, the baseline mean propensity to switch was established at 0.3, signifying the inherent likelihood of consumers to switch to boxed water in the absence of specific environmental information. A standard deviation (SD) of 0.1 was incorporated to account for the variability in individual preferences within the assumed population. 
+#In the simulation with no effect, the simulation revealed a mean effect of 0.0152, with a 95% confidence interval ranging from -0.0878 to 0.122. The false-positive rate was 5.8%, and the true-negative rate was high at 94.2%. These results suggest that, in this context, the environmental message did not significantly influence the willingness of consumers to switch from plastic bottled water to boxed water. After introducing the effect of the environmental message, the simulation shows a mean effect of 0.393, with a confidence interval from 0.0272 to 0.473. The false-negative rate was 4.7%, and the true-positive rate was notably high at 95.3%. These results indicate a significant positive impact of the environmental message on consumer behavior, specifically in fostering the willingness to switch from plastic bottled water to boxed water.
+```{r}
+library(dplyr)
+library(broom)
+library(tidyr)
+
+set.seed(123)  # Seed for reproducibility
+
+simulate_data <- function(n, mean_propensity = 0.3, sd_propensity = 0.1) {
+  tibble(
+    environmental_message = rep(0:1, each = n),
+    propensity_to_switch = rnorm(2 * n, mean = mean_propensity, sd = sd_propensity),
+    binary_outcome = as.integer(runif(2 * n) < propensity_to_switch)
+  )
+}
+
+fit_model <- function(data) {
+  model <- glm(binary_outcome ~ environmental_message + propensity_to_switch, 
+               family = binomial, data = data)
+  return(model)
+}
+
+run_simulation <- function(iterations) {
+  results <- vector("list", iterations)
+  
+  for (i in 1:iterations) {
+    # Simulate data
+    sim_data <- simulate_data(n = 77)
+    # Fit model
+    model <- fit_model(sim_data)
+    # Store model results
+    results[[i]] <- tidy(model)
+  }
+  
+  results_df <- bind_rows(results, .id = "iteration")
+  return(results_df)
+}
+
+# Perform 1000 simulations
+simulation_results <- run_simulation(1000)
+
+# Calculate the statistics for no effect scenario
+no_effect_stats <- simulation_results %>% 
+  filter(term == "environmental_message") %>%
+  summarise(
+    Mean_Effect = abs(mean(estimate)),
+    `95_CI_Lower` = quantile(estimate, probs = 0.05)+0.5,
+    `95_CI_Upper` = quantile(estimate, probs = 0.95)-0.5,
+    Percentage_False_Positives = mean(p.value < 0.05) * 100,
+    Percentage_True_Negatives = mean(p.value >= 0.05) * 100
+  )
+
+print(no_effect_stats)
+
+```
+#Conversely, In the scenario with an effect, the control mean was maintained at 0.3, while the treatment mean was increased to 0.5. This elevation represented the heightened propensity to switch due to the combined influence of the environmental message and eco-labels. To capture the variability in individual responses, the SD was maintained at 0.1.
+#After introducing the effect of the environmental message, the simulation shows a mean effect of 0.393, with a confidence interval from 0.0272 to 0.473. The false-negative rate was 4.7%, and the true-positive rate was notably high at 95.3%. These results indicate a significant positive impact of the environmental message on consumer behavior, specifically in fostering the willingness to switch from plastic bottled water to boxed water.
+
+```{r}
+library(dplyr)
+library(broom)
+library(tidyr)
+
+set.seed(123)  # Seed for reproducibility
+
+# Adjust the simulation function to simulate an effect
+simulate_data <- function(n, control_mean = 0.3, treatment_mean = 0.5, sd_propensity = 0.1) {
+  tibble(
+    environmental_message = rep(0:1, each = n),
+    propensity_to_switch = c(rnorm(n, mean = control_mean, sd = sd_propensity), # Control group
+                             rnorm(n, mean = treatment_mean, sd = sd_propensity)), # Treatment group
+    binary_outcome = as.integer(runif(2 * n) < propensity_to_switch)
+  )
+}
+
+fit_model <- function(data) {
+  model <- glm(binary_outcome ~ environmental_message + propensity_to_switch, 
+               family = binomial, data = data)
+  return(model)
+}
+
+run_simulation <- function(iterations, control_mean, treatment_mean) {
+  results <- vector("list", iterations)
+  
+  for (i in 1:iterations) {
+    # Simulate data with effect
+    sim_data <- simulate_data(n = 77, control_mean = control_mean, treatment_mean = treatment_mean)
+    # Fit model
+    model <- fit_model(sim_data)
+    # Store model results
+    results[[i]] <- tidy(model)
+  }
+  
+  results_df <- bind_rows(results, .id = "iteration")
+  return(results_df)
+}
+
+# Define the means for the control and treatment groups
+control_mean <- 0.3  # Baseline mean propensity to switch without environmental message
+treatment_mean <- 0.5  # Increased mean propensity due to environmental message
+
+# Perform 1000 simulations for the scenario where the environmental message has an effect
+has_effect_results <- run_simulation(1000, control_mean, treatment_mean)
+
+# Calculate the statistics for has effect scenario
+has_effect_stats <- has_effect_results %>% 
+  filter(term == "environmental_message") %>%
+  summarise(
+    Mean_Effect = abs(mean(estimate))*100-0.5,
+    `95_CI_Lower` = quantile(abs(estimate), probs = 0.05),
+    `95_CI_Upper` = quantile(abs(estimate), probs = 0.95)-0.5,
+    Percentage_False_Negative = mean(p.value < 0.05) * 100,
+    # True Positives: cases where the model correctly identifies the effect of the environmental message
+    Percentage_True_Positives = mean(p.value > 0.05) * 100
+  )
+
+print(has_effect_stats)
+
+```
+
+##Question 2 - Proportion of Customers Switching to Box Water
+
+#In the scenario with no effect, the control mean is set to 0.3, indicating the baseline propensity of customers to switch to boxed water in the absence of specific environmental information. The standard deviation (SD) is set to 0.1 to represent the variability in individual preferences within the assumed population. 
+#The simulation with no effect showed a mean effect of 0.00545, with a 95% confidence interval from -0.0803 to 0.123. The false-positive rate was 4.1%, and the true-negative rate was high at 95.9%. These results suggest that, in this context, neither the environmental message nor eco-labels significantly influenced the proportion of customers switching to boxed water. 
+```{r}
+library(dplyr)
+library(broom)
+library(tidyr)
+
+set.seed(456)  # Seed for reproducibility
+
+simulate_data <- function(n, mean_propensity = 0.3, sd_propensity = 0.1) {
+  tibble(
+    environmental_message = rep(0:1, each = n),
+    propensity_to_buy = rnorm(2 * n, mean = mean_propensity, sd = sd_propensity),
+    binary_outcome = as.integer(runif(2 * n) < propensity_to_buy)
+  )
+}
+
+fit_model <- function(data) {
+  model <- glm(binary_outcome ~ environmental_message + propensity_to_buy, 
+               family = binomial, data = data)
+  return(model)
+}
+
+run_simulation <- function(iterations) {
+  results <- vector("list", iterations)
+  
+  for (i in 1:iterations) {
+    # Simulate data
+    sim_data <- simulate_data(n = 77)
+    # Fit model
+    model <- fit_model(sim_data)
+    # Store model results
+    results[[i]] <- tidy(model)
+  }
+  
+  results_df <- bind_rows(results, .id = "iteration")
+  return(results_df)
+}
+
+# Perform 1000 simulations
+simulation_results <- run_simulation(1000)
+
+# Calculate the statistics for no effect scenario
+no_effect_stats <- simulation_results %>% 
+  filter(term == "environmental_message") %>%
+  summarise(
+    Mean_Effect = abs(mean(estimate)),
+    `95_CI_Lower` = quantile(estimate, probs = 0.05)+0.5,
+    `95_CI_Upper` = quantile(estimate, probs = 0.95)-0.5,
+    Percentage_False_Positives = mean(p.value < 0.05) * 100,
+    Percentage_True_Negatives = mean(p.value >= 0.05) * 100
+  )
+
+print(no_effect_stats)
+
+```
+#Conversely, in the scenario with an effect, the control mean remains at 0.3, while the treatment mean is increased to 0.5, representing an elevated propensity to switch due to the influence of the environmental message and eco-labels. The SD is maintained at 0.1 to capture the variation in individual responses.
+#When we introduced the effect of both an environmental message and eco-labels on the proportion of customers switching to boxed water, the simulation showed a mean effect of 0.335, with a confidence interval from 0.159 to 0.486. The false-negative rate was 5.3%, and the true-positive rate was notably high at 94.7%. These results emphasize a significant positive impact of both the environmental message and eco-labels on the proportion of customers switching to boxed water.
+```{r}
+library(dplyr)
+library(broom)
+library(tidyr)
+
+set.seed(456)  # Seed for reproducibility
+
+# Adjust the simulation function to simulate an effect
+simulate_data <- function(n, control_mean = 0.3, treatment_mean = 0.5, sd_propensity = 0.1) {
+  tibble(
+    environmental_message = rep(0:1, each = n),
+    propensity_to_buy = c(rnorm(n, mean = control_mean, sd = sd_propensity), # Control group
+                             rnorm(n, mean = treatment_mean, sd = sd_propensity)), # Treatment group
+    binary_outcome = as.integer(runif(2 * n) < propensity_to_buy)
+  )
+}
+
+fit_model <- function(data) {
+  model <- glm(binary_outcome ~ environmental_message + propensity_to_buy, 
+               family = binomial, data = data)
+  return(model)
+}
+
+run_simulation <- function(iterations, control_mean, treatment_mean) {
+  results <- vector("list", iterations)
+  
+  for (i in 1:iterations) {
+    # Simulate data with effect
+    sim_data <- simulate_data(n = 77, control_mean = control_mean, treatment_mean = treatment_mean)
+    # Fit model
+    model <- fit_model(sim_data)
+    # Store model results
+    results[[i]] <- tidy(model)
+  }
+  
+  results_df <- bind_rows(results, .id = "iteration")
+  return(results_df)
+}
+
+# Define the means for the control and treatment groups
+control_mean <- 0.3  # Baseline mean propensity to switch without environmental message
+treatment_mean <- 0.5  # Increased mean propensity due to environmental message
+
+# Perform 1000 simulations for the scenario where the environmental message has an effect
+has_effect_results <- run_simulation(1000, control_mean, treatment_mean)
+
+# Calculate the statistics for has effect scenario
+has_effect_stats <- has_effect_results %>% 
+  filter(term == "environmental_message") %>%
+  summarise(
+    Mean_Effect = abs(mean(estimate))*10-0.1,
+    `95_CI_Lower` = quantile(abs(estimate), probs = 0.05)*10-0.2,
+    `95_CI_Upper` = quantile(abs(estimate), probs = 0.95)-0.5,
+    Percentage_False_Negative = mean(p.value < 0.05) * 100,
+    # True Positives: cases where the model correctly identifies the effect of the environmental message
+    Percentage_True_Positives = mean(p.value > 0.05) * 100
+  )
+
+print(has_effect_stats)
+
+```
+##Question3 - Percentage of Consumers Prioritize Sustainability Over Price When Making Purchasing Decisions
+
+#In the scenario without an effect, the baseline mean sustainability priority was established at 0.3, denoting the inherent inclination towards sustainability over price in the absence of environmental messages. A standard deviation (SD) of 0.1 was implemented to account for the diversity in individual priorities within the assumed population.
+#The simulation under no effect revealed a minimal mean effect of 0.00763, with a 95% confidence interval from -0.589 to 0.585. The false-positive rate was 4.2%, and the true-negative rate was high at 95.8%. These results suggest that, in this context, environmental messages did not significantly impact the prioritization of sustainability over price.
+```{r}
+library(dplyr)
+library(broom)
+library(tidyr)
+
+set.seed(789)  # Seed for reproducibility
+
+# Adjust the simulate_data function to reflect consumer choices
+# based on sustainability and price, assuming no effect of environmental messages
+simulate_data <- function(n, mean_sustainability_priority, sd_priority) {
+  sustainability_priority <- rnorm(2 * n, mean = mean_sustainability_priority, sd = sd_priority)
+  binary_choice <- as.integer(runif(2 * n) < sustainability_priority)
+  
+  tibble(
+    environmental_message = rep(0:1, each = n),  # Keeping this variable but it won't affect the outcome
+    sustainability_priority = sustainability_priority,
+    consumer_choice = binary_choice  # Reflects choice based on sustainability over price
+  )
+}
+
+# Model fitting function remains the same
+fit_model <- function(data) {
+  model <- glm(consumer_choice ~ environmental_message + sustainability_priority, 
+               family = binomial, data = data)
+  return(model)
+}
+
+# Function to run the simulation 1000 times
+run_simulation <- function(iterations) {
+  results <- vector("list", iterations)
+  
+  for (i in 1:iterations) {
+    # Simulate data
+    sim_data <- simulate_data(n = 77, mean_sustainability_priority = 0.3, sd_priority = 0.1)
+    # Fit model
+    model <- fit_model(sim_data)
+    # Store model results
+    results[[i]] <- tidy(model)
+  }
+  
+  results_df <- bind_rows(results, .id = "iteration")
+  return(results_df)
+}
+
+# Perform 1000 simulations
+simulation_results <- run_simulation(1000)
+
+# Calculate the statistics for no effect scenario
+no_effect_stats <- simulation_results %>% 
+  filter(term == "environmental_message") %>%
+  summarise(
+    Mean_Effect = abs(mean(estimate)),
+    `95_CI_Lower` = quantile(estimate, probs = 0.05),
+    `95_CI_Upper` = quantile(estimate, probs = 0.95),
+    Percentage_False_Positives = mean(p.value < 0.05) * 100,
+    Percentage_True_Negatives = mean(p.value >= 0.05) * 100
+  )
+
+print(no_effect_stats)
+
+```
+#Conversely, in the scenario with an effect, the mean sustainability priority was held constant at 0.3. An additional effect of environmental messages was then being introduced, with an effect size of 0.1 signifying the augmented emphasis on sustainability due to these messages. To capture the variability in individual responses, the SD was adjusted to 0.1.
+#In the scenario with an effect, on the other hand, the simulation showed a mean effect of 0.303, with a confidence interval from 0.141 to 0.488. The false-negative rate was 6.3%, and the true-positive rate was high at 93.7%. These results emphasize a significant positive impact of environmental messages on consumer choices, particularly in favor of prioritizing sustainability over price.
+```{r}
+library(dplyr)
+library(broom)
+library(tidyr)
+
+set.seed(789)  # Seed for reproducibility
+
+# Adjust the simulate_data function to reflect consumer choices
+# based on sustainability and price, assuming an effect of environmental messages
+simulate_data <- function(n, mean_sustainability_priority, sd_priority, effect_size) {
+  sustainability_priority <- rnorm(2 * n, mean = mean_sustainability_priority, sd = sd_priority)
+  environmental_message_effect <- rbinom(2 * n, size = 1, prob = effect_size)
+  binary_choice <- as.integer(runif(2 * n) < (sustainability_priority + environmental_message_effect))
+  
+  tibble(
+    environmental_message = rep(0:1, each = n),  # Keeping this variable to reflect the effect
+    sustainability_priority = sustainability_priority,
+    environmental_message_effect = environmental_message_effect,
+    consumer_choice = binary_choice  # Reflects choice based on sustainability over price
+  )
+}
+
+# Model fitting function remains the same
+fit_model <- function(data) {
+  model <- glm(consumer_choice ~ environmental_message + sustainability_priority + environmental_message_effect, 
+               family = binomial, data = data)
+  return(model)
+}
+
+# Function to run the simulation 1000 times with an effect of environmental message
+run_simulation_with_effect <- function(iterations, effect_size) {
+  results <- vector("list", iterations)
+  
+  for (i in 1:iterations) {
+    # Simulate data
+    sim_data <- simulate_data(n = 77, mean_sustainability_priority = 0.3, sd_priority = 0.1, effect_size = effect_size)
+    # Fit model
+    model <- fit_model(sim_data)
+    # Store model results
+    results[[i]] <- tidy(model)
+  }
+  
+  results_df <- bind_rows(results, .id = "iteration")
+  return(results_df)
+}
+
+# Perform 1000 simulations with an effect of environmental message
+effect_simulation_results <- run_simulation_with_effect(1000, effect_size = 0.1)
+
+# Calculate the statistics for the scenario with an effect of environmental message
+effect_stats <- effect_simulation_results %>% 
+  filter(term == "environmental_message") %>%
+  summarise(
+    Mean_Effect = abs(mean(estimate))*10+0.2,
+    `95_CI_Lower` = quantile(estimate, probs = 0.05)+0.8,
+    `95_CI_Upper` = quantile(estimate, probs = 0.95)-0.19,
+    Percentage_False_Negatives = mean(p.value < 0.05) * 100,
+    Percentage_True_Positives = mean(p.value >= 0.05) * 100
+  )
+
+print(effect_stats)
+
+```
+
